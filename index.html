@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pase de Lista Semanal</title>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f4f7f6; 
+            margin: 0; 
+            padding: 20px; 
+            color: #333;
+        }
+        .container { 
+            max-width: 1100px; 
+            margin: auto; 
+            background: white; 
+            padding: 25px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1); 
+        }
+        h1 { text-align: center; color: #2c3e50; }
+        
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .fecha-selector {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: bold;
+        }
+        .fecha-selector input { width: auto; }
+
+        .form-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); 
+            gap: 15px; 
+            margin-bottom: 20px; 
+        }
+        .full-width { grid-column: 1 / -1; }
+        label { 
+            display: block; 
+            font-weight: bold; 
+            margin-bottom: 5px; 
+            font-size: 14px;
+        }
+        input, select, textarea { 
+            width: 100%; 
+            padding: 10px; 
+            border: 1px solid #ccc; 
+            border-radius: 6px; 
+            box-sizing: border-box; 
+            font-family: inherit;
+        }
+        button { 
+            background-color: #007bff; 
+            color: white; 
+            border: none; 
+            padding: 12px 20px; 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: bold; 
+            transition: 0.3s; 
+            width: 100%;
+        }
+        button:hover { background-color: #0056b3; }
+        
+        .acciones-archivos {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .btn-export { background-color: #28a745; width: auto; }
+        .btn-export:hover { background-color: #218838; }
+        
+        .btn-json { 
+            background-color: #6f42c1; 
+            width: auto; 
+            display: inline-block;
+            text-align: center;
+        }
+        .btn-json:hover { background-color: #59339d; }
+        
+        /* Tabla */
+        .table-responsive { overflow-x: auto; clear: both; }
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            margin-top: 10px; 
+        }
+        th, td { 
+            border: 1px solid #ddd; 
+            padding: 12px; 
+            text-align: center; 
+            font-size: 14px;
+        }
+        th { background-color: #f8f9fa; }
+        .hidden { display: none !important; }
+        
+        /* Botones de estado */
+        .status-btn { 
+            padding: 6px 12px; 
+            font-size: 12px; 
+            border-radius: 4px; 
+            color: white; 
+            border: none;
+            cursor: pointer;
+        }
+        .status-presente { background-color: #6c757d; }
+        .status-salio { background-color: #ffc107; color: black; }
+        .status-regreso { background-color: #17a2b8; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📝 Pase de Lista Diario y Semanal</h1>
+    
+    <div class="header-controls">
+        <div class="fecha-selector">
+            <label for="fecha-actual">📅 Selecciona el día:</label>
+            <input type="date" id="fecha-actual" onchange="cambiarFecha()">
+        </div>
+        <div class="acciones-archivos">
+            <button class="btn-export" onclick="exportarExcel()">📥 Descargar Excel con Hojas (.xlsx)</button>
+            <button class="btn-json" onclick="exportarJSON()">💾 Guardar Respaldo (.json)</button>
+            <label class="btn-json" style="cursor: pointer;">
+                📂 Cargar Respaldo (.json)
+                <input type="file" accept=".json" onchange="cargarJSON(event)" class="hidden">
+            </label>
+        </div>
+    </div>
+    
+    <div class="form-grid">
+        <div>
+            <label for="nombre">Nombre Completo</label>
+            <input type="text" id="nombre" placeholder="Ej. Ana García" required>
+        </div>
+        <div>
+            <label for="edad">Edad</label>
+            <input type="number" id="edad" placeholder="Ej. 8" required>
+        </div>
+        <div>
+            <label for="grupo">Grupo</label>
+            <input type="text" id="grupo" placeholder="Ej. A" required>
+        </div>
+        <div>
+            <label for="natacion">¿Va a natación?</label>
+            <select id="natacion" onchange="toggleTiempos()">
+                <option value="No">No</option>
+                <option value="Sí">Sí</option>
+            </select>
+        </div>
+        <div id="div-salida" class="hidden">
+            <label for="hora-salida">Hora de Salida</label>
+            <input type="time" id="hora-salida">
+        </div>
+        <div id="div-regreso" class="hidden">
+            <label for="hora-regreso">Hora de Regreso</label>
+            <input type="time" id="hora-regreso">
+        </div>
+        <div class="full-width">
+            <label for="notas">Anotaciones</label>
+            <textarea id="notas" rows="2" placeholder="Observaciones del día..."></textarea>
+        </div>
+        <div class="full-width">
+            <button onclick="agregarRegistro()">➕ Agregar a la Lista del Día</button>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Edad</th>
+                    <th>Grupo</th>
+                    <th>Natación</th>
+                    <th>H. Salida</th>
+                    <th>H. Regreso</th>
+                    <th>Anotaciones</th>
+                    <th>Estado de Natación</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-cuerpo">
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // Ahora guardamos los datos organizados por fecha
+    let baseDeDatos = {}; 
+    let fechaActual = "";
+
+    // Inicializar la fecha de hoy al cargar la página
+    window.onload = function() {
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById("fecha-actual").value = hoy;
+        cambiarFecha();
+    };
+
+    function cambiarFecha() {
+        fechaActual = document.getElementById("fecha-actual").value;
+        if (!baseDeDatos[fechaActual]) {
+            baseDeDatos[fechaActual] = []; // Crear arreglo vacío si el día no tiene registros aún
+        }
+        actualizarTabla();
+    }
+
+    function toggleTiempos() {
+        const natacion = document.getElementById("natacion").value;
+        const divSalida = document.getElementById("div-salida");
+        const divRegreso = document.getElementById("div-regreso");
+        
+        if (natacion === "Sí") {
+            divSalida.classList.remove("hidden");
+            divRegreso.classList.remove("hidden");
+        } else {
+            divSalida.classList.add("hidden");
+            divRegreso.classList.add("hidden");
+            document.getElementById("hora-salida").value = "";
+            document.getElementById("hora-regreso").value = "";
+        }
+    }
+
+    function agregarRegistro() {
+        const nombre = document.getElementById("nombre").value;
+        const edad = document.getElementById("edad").value;
+        const grupo = document.getElementById("grupo").value;
+        const natacion = document.getElementById("natacion").value;
+        const horaSalida = document.getElementById("hora-salida").value || "N/A";
+        const horaRegreso = document.getElementById("hora-regreso").value || "N/A";
+        const notas = document.getElementById("notas").value || "Ninguna";
+
+        if (!nombre || !edad || !grupo) {
+            alert("Por favor, llena nombre, edad y grupo.");
+            return;
+        }
+
+        const registro = {
+            id: Date.now(),
+            nombre,
+            edad,
+            grupo,
+            natacion,
+            horaSalida,
+            horaRegreso,
+            notas,
+            estado: natacion === "Sí" ? 0 : -1 // -1: No aplica, 0: Presente, 1: Salió, 2: Regresó
+        };
+
+        baseDeDatos[fechaActual].push(registro);
+        actualizarTabla();
+        limpiarFormulario();
+    }
+
+    function cambiarEstado(id) {
+        const listaDelDia = baseDeDatos[fechaActual];
+        const index = listaDelDia.findIndex(r => r.id === id);
+        if (index !== -1) {
+            if (listaDelDia[index].estado === 0) {
+                listaDelDia[index].estado = 1; // Salió
+            } else if (listaDelDia[index].estado === 1) {
+                listaDelDia[index].estado = 2; // Regresó
+            }
+            actualizarTabla();
+        }
+    }
+
+    function actualizarTabla() {
+        const tbody = document.getElementById("tabla-cuerpo");
+        tbody.innerHTML = "";
+        
+        const listaDelDia = baseDeDatos[fechaActual] || [];
+
+        listaDelDia.forEach(registro => {
+            let botonEstado = "No aplica";
+            let estadoTexto = "No aplica";
+
+            if (registro.estado === 0) {
+                botonEstado = `<button class="status-btn status-presente" onclick="cambiarEstado(${registro.id})">Presente (Click si sale)</button>`;
+                estadoTexto = "Presente";
+            } else if (registro.estado === 1) {
+                botonEstado = `<button class="status-btn status-salio" onclick="cambiarEstado(${registro.id})">Salió (Click si regresó)</button>`;
+                estadoTexto = "En natación";
+            } else if (registro.estado === 2) {
+                botonEstado = `<span class="status-btn status-regreso">Ya regresó ✔️</span>`;
+                estadoTexto = "Regresó";
+            }
+
+            registro.estadoTexto = estadoTexto;
+
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${registro.nombre}</td>
+                <td>${registro.edad}</td>
+                <td>${registro.grupo}</td>
+                <td>${registro.natacion}</td>
+                <td>${registro.horaSalida}</td>
+                <td>${registro.horaRegreso}</td>
+                <td>${registro.notas}</td>
+                <td>${botonEstado}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function limpiarFormulario() {
+        document.getElementById("nombre").value = "";
+        document.getElementById("edad").value = "";
+        document.getElementById("grupo").value = "";
+        document.getElementById("natacion").value = "No";
+        document.getElementById("notas").value = "";
+        toggleTiempos();
+    }
+
+    // --- NUEVA FUNCIÓN PARA EXPORTAR EXCEL MULTIPLES HOJAS ---
+    function exportarExcel() {
+        // Revisar si hay datos en algún día
+        let tieneDatos = false;
+        for (const fecha in baseDeDatos) {
+            if (baseDeDatos[fecha].length > 0) tieneDatos = true;
+        }
+
+        if (!tieneDatos) {
+            alert("No hay datos en ningún día para exportar.");
+            return;
+        }
+
+        // Crear un nuevo libro de Excel
+        const workbook = XLSX.utils.book_new();
+
+        // Recorrer cada fecha en la base de datos
+        for (const fecha in baseDeDatos) {
+            const listaDia = baseDeDatos[fecha];
+            
+            // Si el día está vacío, no creamos la hoja
+            if (listaDia.length === 0) continue;
+
+            // Formatear los datos para que los títulos de columnas se vean bien en Excel
+            const datosParaExcel = listaDia.map(row => ({
+                "Nombre": row.nombre,
+                "Edad": row.edad,
+                "Grupo": row.grupo,
+                "Natación": row.natacion,
+                "Hora de Salida": row.horaSalida,
+                "Hora de Regreso": row.horaRegreso,
+                "Estado de Natación": row.estadoTexto || "No aplica",
+                "Anotaciones": row.notas
+            }));
+
+            // Convertir los datos a una hoja de cálculo
+            const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
+            
+            // Añadir la hoja al libro (nombrando la pestaña con la fecha)
+            XLSX.utils.book_append_sheet(workbook, worksheet, fecha);
+        }
+
+        // Descargar el archivo
+        XLSX.writeFile(workbook, "Pase_de_Lista_Completo.xlsx");
+    }
+
+    // --- FUNCIONES JSON ACTUALIZADAS PARA GUARDAR TODOS LOS DÍAS ---
+    function exportarJSON() {
+        let tieneDatos = false;
+        for (const fecha in baseDeDatos) {
+            if (baseDeDatos[fecha].length > 0) tieneDatos = true;
+        }
+
+        if (!tieneDatos) {
+            alert("No hay datos para guardar.");
+            return;
+        }
+        
+        const dataStr = JSON.stringify(baseDeDatos, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Respaldo_Completo.json`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function cargarJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const jsonCargado = JSON.parse(e.target.result);
+                // Validar que sea un objeto (formato de nuestra nueva baseDeDatos)
+                if (typeof jsonCargado === 'object' && !Array.isArray(jsonCargado)) {
+                    baseDeDatos = jsonCargado;
+                    cambiarFecha(); // Refrescar la tabla actual
+                    alert("¡Respaldo completo cargado correctamente! ✨");
+                } else {
+                    alert("El archivo no tiene el formato correcto. Recuerda usar un respaldo generado con esta nueva versión.");
+                }
+            } catch (error) {
+                alert("Error al leer el archivo JSON. Asegúrate de que sea el archivo correcto.");
+            }
+        };
+        reader.readAsText(file);
+        
+        event.target.value = ""; // Limpiar input
+    }
+</script>
+
+</body>
+</html>
