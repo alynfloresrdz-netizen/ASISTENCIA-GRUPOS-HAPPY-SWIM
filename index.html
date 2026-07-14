@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pase de Lista Semanal Pro</title>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f4f7f6; 
+            margin: 0; 
+            padding: 20px; 
+            color: #333;
+        }
+        .container { 
+            max-width: 1200px; 
+            margin: auto; 
+            background: white; 
+            padding: 25px; 
+            border-radius: 10px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1); 
+        }
+        h1 { text-align: center; color: #2c3e50; }
+        
+        .header-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #e9ecef;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        /* Dashboard Grid */
+        .dashboard-container {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .panel {
+            background: #fff;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        
+        /* Resumen Textual */
+        .metricas-rapidas {
+            display: flex;
+            justify-content: space-around;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .metrica h3 { margin: 0; font-size: 24px; color: #007bff; }
+        .metrica p { margin: 5px 0 0; font-size: 14px; font-weight: bold; }
+
+        .form-grid { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); 
+            gap: 15px; 
+        }
+        .full-width { grid-column: 1 / -1; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 13px; }
+        input, select, textarea { 
+            width: 100%; padding: 8px; border: 1px solid #ccc; 
+            border-radius: 6px; box-sizing: border-box; font-family: inherit; font-size: 13px;
+        }
+        button { 
+            background-color: #007bff; color: white; border: none; 
+            padding: 10px 15px; border-radius: 6px; cursor: pointer; 
+            font-weight: bold; transition: 0.3s; width: 100%;
+        }
+        button:hover { background-color: #0056b3; }
+        
+        .acciones-archivos { display: flex; gap: 10px; flex-wrap: wrap; }
+        .btn-export { background-color: #28a745; width: auto; }
+        .btn-json { background-color: #6f42c1; width: auto; display: inline-block; text-align: center; }
+        
+        /* Buscador y Filtros */
+        .filtros-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        
+        /* Tabla */
+        .table-responsive { overflow-x: auto; clear: both; margin-top: 15px; }
+        table { width: 100%; border-collapse: collapse; white-space: nowrap; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; font-size: 13px; }
+        th { background-color: #343a40; color: white; }
+        
+        /* Etiquetas de Color */
+        .etiqueta { padding: 4px 8px; border-radius: 12px; font-weight: bold; font-size: 11px; }
+        .etiqueta-verde { background-color: #d4edda; color: #155724; }
+        .etiqueta-amarilla { background-color: #fff3cd; color: #856404; }
+        .etiqueta-roja { background-color: #f8d7da; color: #721c24; }
+        
+        /* Botones de estado */
+        .status-btn { padding: 6px 10px; font-size: 11px; border-radius: 4px; color: white; border: none; cursor: pointer; }
+        .status-presente { background-color: #6c757d; }
+        .status-salio { background-color: #ffc107; color: black; }
+        .status-regreso { background-color: #17a2b8; }
+        .hidden { display: none !important; }
+        
+        .nota-atajos { font-size: 11px; color: #666; text-align: right; margin-top: 5px; font-style: italic; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📝 Pase de Lista Bitácora Pro</h1>
+    
+    <div class="header-controls">
+        <div>
+            <label for="fecha-actual" style="display:inline; margin-right: 10px;">📅 Fecha:</label>
+            <input type="date" id="fecha-actual" onchange="cambiarFecha()" style="width:auto; display:inline-block;">
+        </div>
+        <div class="acciones-archivos">
+            <button class="btn-export" onclick="exportarExcel()">📥 Excel Semanal</button>
+            <button class="btn-json" onclick="exportarJSON()">💾 Guardar Respaldo</button>
+            <label class="btn-json" style="cursor: pointer;">
+                📂 Cargar Respaldo
+                <input type="file" accept=".json" onchange="cargarJSON(event)" class="hidden">
+            </label>
+        </div>
+    </div>
+    
+    <div class="dashboard-container">
+        <div class="panel form-grid">
+            <div>
+                <label>Nombre Completo</label>
+                <input type="text" id="nombre" placeholder="Ej. Ana García">
+            </div>
+            <div>
+                <label>Edad</label>
+                <input type="number" id="edad">
+            </div>
+            <div>
+                <label>Grupo</label>
+                <input type="text" id="grupo">
+            </div>
+            
+            <div>
+                <label>Llegada al Recinto</label>
+                <input type="time" id="llegada-general">
+            </div>
+            <div>
+                <label>Contacto Emergencia</label>
+                <input type="text" id="emergencia" placeholder="Teléfono">
+            </div>
+            <div>
+                <label>Alergias / Médicos</label>
+                <input type="text" id="alergias" placeholder="Ninguna">
+            </div>
+
+            <div>
+                <label>¿Va a natación?</label>
+                <select id="natacion" onchange="toggleTiempos()">
+                    <option value="No">No</option>
+                    <option value="Sí">Sí</option>
+                </select>
+            </div>
+            <div id="div-salida" class="hidden">
+                <label>Salida a Natación</label>
+                <input type="time" id="hora-salida">
+            </div>
+            <div id="div-regreso" class="hidden">
+                <label>Regreso de Natación</label>
+                <input type="time" id="hora-regreso">
+            </div>
+            
+            <div>
+                <label>Comportamiento / Estado</label>
+                <select id="etiqueta-color">
+                    <option value="verde">🟢 Excelente</option>
+                    <option value="amarillo">🟡 Incidente Menor</option>
+                    <option value="rojo">🔴 Requiere Atención</option>
+                </select>
+            </div>
+            <div class="full-width">
+                <label>Anotaciones</label>
+                <input type="text" id="notas" placeholder="Observaciones del día...">
+            </div>
+            <div class="full-width">
+                <button onclick="agregarRegistro()">➕ Agregar a la Lista</button>
+                <div class="nota-atajos">💡 Atajos Mac: <b>Cmd + Enter</b> para agregar | <b>Cmd + S</b> para guardar respaldo</div>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3 style="text-align: center; margin-top: 0;">Dashboard del Día</h3>
+            <div class="metricas-rapidas">
+                <div class="metrica"><h3 id="metric-total">0</h3><p>Total</p></div>
+                <div class="metrica"><h3 id="metric-alberca" style="color:#ffc107;">0</h3><p>En Agua</p></div>
+                <div class="metrica"><h3 id="metric-fuera" style="color:#17a2b8;">0</h3><p>Fuera</p></div>
+            </div>
+            <div style="position: relative; height: 180px; width: 100%;">
+                <canvas id="miGrafica"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="filtros-container">
+        <div style="flex-grow: 1;">
+            <label>🔍 Buscar Niño/a</label>
+            <input type="text" id="buscador" onkeyup="actualizarTabla()" placeholder="Escribe un nombre para filtrar...">
+        </div>
+        <div>
+            <label>🔎 Filtrar por Natación</label>
+            <select id="filtro-natacion" onchange="actualizarTabla()">
+                <option value="todos">Mostrar Todos</option>
+                <option value="alberca">Solo en Alberca</option>
+                <option value="terminaron">Ya regresaron</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Grupo</th>
+                    <th>Emergencia / Médicos</th>
+                    <th>Llegada</th>
+                    <th>Estado Comportamiento</th>
+                    <th>H. Alberca</th>
+                    <th>Estatus Natación</th>
+                    <th>Salida</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-cuerpo">
+                </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    let baseDeDatos = {}; 
+    let fechaActual = "";
+    let graficaInstancia = null;
+
+    window.onload = function() {
+        const hoy = new Date().toISOString().split('T')[0];
+        document.getElementById("fecha-actual").value = hoy;
+        cambiarFecha();
+    };
+
+    // --- ATAJOS DE TECLADO (Mac: Cmd, Win: Ctrl) ---
+    document.addEventListener('keydown', function(e) {
+        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+            e.preventDefault();
+            agregarRegistro();
+        }
+        if ((e.metaKey || e.ctrlKey) && e.key === 's') {
+            e.preventDefault();
+            exportarJSON();
+        }
+    });
+
+    function cambiarFecha() {
+        fechaActual = document.getElementById("fecha-actual").value;
+        if (!baseDeDatos[fechaActual]) baseDeDatos[fechaActual] = [];
+        actualizarTabla();
+    }
+
+    function toggleTiempos() {
+        const natacion = document.getElementById("natacion").value;
+        const divSalida = document.getElementById("div-salida");
+        const divRegreso = document.getElementById("div-regreso");
+        
+        if (natacion === "Sí") {
+            divSalida.classList.remove("hidden");
+            divRegreso.classList.remove("hidden");
+        } else {
+            divSalida.classList.add("hidden");
+            divRegreso.classList.add("hidden");
+            document.getElementById("hora-salida").value = "";
+            document.getElementById("hora-regreso").value = "";
+        }
+    }
+
+    function agregarRegistro() {
+        const nombre = document.getElementById("nombre").value.trim();
+        if (!nombre) { alert("¡Necesitas ingresar al menos un nombre para jugar esta mano!"); return; }
+
+        const registro = {
+            id: Date.now(),
+            nombre,
+            edad: document.getElementById("edad").value || "N/A",
+            grupo: document.getElementById("grupo").value || "N/A",
+            llegadaGen: document.getElementById("llegada-general").value || "N/A",
+            salidaGen: "Pendiente", // Se actualiza manual al irse a casa
+            emergencia: document.getElementById("emergencia").value || "N/A",
+            alergias: document.getElementById("alergias").value || "Ninguna",
+            natacion: document.getElementById("natacion").value,
+            horaSalida: document.getElementById("hora-salida").value || "N/A",
+            horaRegreso: document.getElementById("hora-regreso").value || "N/A",
+            comportamiento: document.getElementById("etiqueta-color").value,
+            notas: document.getElementById("notas").value || "Ninguna",
+            estado: document.getElementById("natacion").value === "Sí" ? 0 : -1 
+        };
+
+        baseDeDatos[fechaActual].push(registro);
+        actualizarTabla();
+        limpiarFormulario();
+        document.getElementById("nombre").focus(); // Regresa el cursor para escribir rápido
+    }
+
+    function cambiarEstadoNatacion(id) {
+        const listaDelDia = baseDeDatos[fechaActual];
+        const index = listaDelDia.findIndex(r => r.id === id);
+        if (index !== -1) {
+            if (listaDelDia[index].estado === 0) listaDelDia[index].estado = 1;
+            else if (listaDelDia[index].estado === 1) listaDelDia[index].estado = 2;
+            actualizarTabla();
+        }
+    }
+
+    function marcarSalidaGeneral(id) {
+        const listaDelDia = baseDeDatos[fechaActual];
+        const index = listaDelDia.findIndex(r => r.id === id);
+        if (index !== -1) {
+            const ahora = new Date();
+            const horas = ahora.getHours().toString().padStart(2, '0');
+            const minutos = ahora.getMinutes().toString().padStart(2, '0');
+            listaDelDia[index].salidaGen = `${horas}:${minutos}`;
+            actualizarTabla();
+        }
+    }
+
+    function actualizarDashboard(listaFiltrada) {
+        const total = listaFiltrada.length;
+        const enAlberca = listaFiltrada.filter(r => r.estado === 1).length;
+        const yaRegresaron = listaFiltrada.filter(r => r.estado === 2).length;
+        const resto = total - enAlberca - yaRegresaron;
+
+        document.getElementById("metric-total").innerText = total;
+        document.getElementById("metric-alberca").innerText = enAlberca;
+        document.getElementById("metric-fuera").innerText = yaRegresaron;
+
+        const ctx = document.getElementById('miGrafica').getContext('2d');
+        if (graficaInstancia) graficaInstancia.destroy();
+
+        graficaInstancia = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['En Alberca', 'Regresaron', 'Otros'],
+                datasets: [{
+                    data: [enAlberca, yaRegresaron, resto],
+                    backgroundColor: ['#ffc107', '#17a2b8', '#6c757d'],
+                    borderWidth: 1
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { boxWidth: 12, font: {size: 10} } } } }
+        });
+    }
+
+    function actualizarTabla() {
+        const tbody = document.getElementById("tabla-cuerpo");
+        tbody.innerHTML = "";
+        
+        let listaDelDia = baseDeDatos[fechaActual] || [];
+        
+        // Aplicar Filtros y Buscador
+        const textoBusqueda = document.getElementById("buscador").value.toLowerCase();
+        const filtroNat = document.getElementById("filtro-natacion").value;
+
+        listaDelDia = listaDelDia.filter(registro => {
+            const pasaBusqueda = registro.nombre.toLowerCase().includes(textoBusqueda);
+            let pasaFiltroNat = true;
+            if (filtroNat === "alberca") pasaFiltroNat = registro.estado === 1;
+            if (filtroNat === "terminaron") pasaFiltroNat = registro.estado === 2;
+            return pasaBusqueda && pasaFiltroNat;
+        });
+
+        actualizarDashboard(baseDeDatos[fechaActual]); // El dashboard siempre muestra el total del día
+
+        listaDelDia.forEach(registro => {
+            // Lógica Estatus Natación
+            let botonEstado = "No aplica";
+            if (registro.estado === 0) botonEstado = `<button class="status-btn status-presente" onclick="cambiarEstadoNatacion(${registro.id})">Presente (Ir)</button>`;
+            else if (registro.estado === 1) botonEstado = `<button class="status-btn status-salio" onclick="cambiarEstadoNatacion(${registro.id})">En Alberca (Regresar)</button>`;
+            else if (registro.estado === 2) botonEstado = `<span class="status-btn status-regreso">Regresó ✔️</span>`;
+            
+            // Lógica Salida General (A casa)
+            let btnSalidaGen = registro.salidaGen === "Pendiente" 
+                ? `<button class="status-btn" style="background:#dc3545;" onclick="marcarSalidaGeneral(${registro.id})">Marcar Salida</button>`
+                : `<b>${registro.salidaGen}</b>`;
+
+            // Lógica Etiquetas Colores
+            let badgeClase = registro.comportamiento === "verde" ? "etiqueta-verde" : (registro.comportamiento === "amarillo" ? "etiqueta-amarilla" : "etiqueta-roja");
+            let badgeTexto = registro.comportamiento === "verde" ? "🟢 OK" : (registro.comportamiento === "amarillo" ? "🟡 Observación" : "🔴 Alerta");
+
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td><b>${registro.nombre}</b><br><small style="color:#666">${registro.notas}</small></td>
+                <td>${registro.grupo}</td>
+                <td><small>📞 ${registro.emergencia}<br>🩺 ${registro.alergias}</small></td>
+                <td>${registro.llegadaGen}</td>
+                <td><span class="etiqueta ${badgeClase}">${badgeTexto}</span></td>
+                <td><small>Va: ${registro.horaSalida}<br>Viene: ${registro.horaRegreso}</small></td>
+                <td>${botonEstado}</td>
+                <td>${btnSalidaGen}</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    function limpiarFormulario() {
+        document.getElementById("nombre").value = "";
+        document.getElementById("alergias").value = "";
+        document.getElementById("emergencia").value = "";
+        document.getElementById("notas").value = "";
+        document.getElementById("etiqueta-color").value = "verde";
+    }
+
+    function exportarExcel() {
+        let tieneDatos = false;
+        for (const fecha in baseDeDatos) { if (baseDeDatos[fecha].length > 0) tieneDatos = true; }
+        if (!tieneDatos) { alert("No hay datos para exportar."); return; }
+
+        const workbook = XLSX.utils.book_new();
+        for (const fecha in baseDeDatos) {
+            const listaDia = baseDeDatos[fecha];
+            if (listaDia.length === 0) continue;
+
+            const datosParaExcel = listaDia.map(row => ({
+                "Nombre": row.nombre,
+                "Edad": row.edad,
+                "Grupo": row.grupo,
+                "Alergias/Médicos": row.alergias,
+                "Contacto Emergencia": row.emergencia,
+                "Hora Llegada": row.llegadaGen,
+                "Hora Salida (Casa)": row.salidaGen,
+                "Comportamiento": row.comportamiento,
+                "Natación": row.natacion,
+                "Salida Alberca": row.horaSalida,
+                "Regreso Alberca": row.horaRegreso,
+                "Estado Alberca": row.estado === 1 ? "En Alberca" : (row.estado === 2 ? "Regresó" : "No aplica/Presente"),
+                "Anotaciones": row.notas
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(datosParaExcel);
+            XLSX.utils.book_append_sheet(workbook, worksheet, fecha);
+        }
+        XLSX.writeFile(workbook, "Bitacora_Pro.xlsx");
+    }
+
+    function exportarJSON() {
+        const dataStr = JSON.stringify(baseDeDatos, null, 2);
+        const blob = new Blob([dataStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Respaldo_Bitacora.json`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+
+    function cargarJSON(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const jsonCargado = JSON.parse(e.target.result);
+                if (typeof jsonCargado === 'object' && !Array.isArray(jsonCargado)) {
+                    baseDeDatos = jsonCargado;
+                    cambiarFecha();
+                    alert("¡Respaldo cargado correctamente! ✨");
+                }
+            } catch (error) { alert("Error al leer el archivo JSON."); }
+        };
+        reader.readAsText(file);
+        event.target.value = ""; 
+    }
+</script>
+
+</body>
+</html>
